@@ -1,0 +1,88 @@
+import re
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from colorama import Fore
+from urllib.parse import urlparse
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, ExtraTreesClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import SGDClassifier
+from sklearn.naive_bayes import GaussianNB
+from tld import get_tld, is_tld
+file = r"C:\Users\sanje\Downloads\kish project\malicious_phish.csv"
+data = pd.read_csv(file)
+#print(data.head())
+#print(data.isnull().sum())
+data['url'] = data['url'].replace('www.', '', regex=True)
+#print(data)
+rem = {"Category": {"benign": 0, "defacement": 1, "phishing": 2, "malware": 3}}
+data['Category'] = data['type']
+
+# Set the option before using replace
+pd.set_option('future.no_silent_downcasting', True)
+data = data.replace(rem)
+data['url_len'] = data['url'].apply(lambda x: len(str(x)))
+def process_tld(url):
+    try:
+        res = get_tld(url, as_object = True, fail_silently=False,fix_protocol=True)
+        pri_domain= res.parsed_url.netloc
+    except :
+        pri_domain= None
+    return pri_domain
+data['domain'] = data['url'].apply(lambda i: process_tld(i))
+#print(data.head())
+feature = ['@','?','-','=','.','#','%','+','$','!','*',',','//']
+for a in feature:
+    data[a] = data['url'].apply(lambda i: i.count(a))
+#print(data.head())
+
+from sklearn.preprocessing import LabelEncoder
+
+X = data.drop(['url', 'type', 'Category', 'domain'], axis=1)  # ,'type_code'
+y = data['Category']
+
+# Use LabelEncoder to encode categorical labels
+label_encoder = LabelEncoder()
+y_encoded = label_encoder.fit_transform(y)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, random_state=2)
+
+# MODELS
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
+
+models = [DecisionTreeClassifier, GaussianNB]
+
+accuracy_test = []
+
+for m in models:
+    model_ = m()
+    model_.fit(X_train, y_train)
+    pred = model_.predict(X_test)
+    acc = accuracy_score(pred, y_test)
+    accuracy_test.append(acc)
+    print(m)
+    print('Test Accuracy : {:.2f}%'.format(acc * 100))
+    print('Classification Report of :',m)
+    print(classification_report(y_test, pred))
+    print('Confusion Matrix:')
+    cf_matrix = confusion_matrix(y_test, pred)
+
+    # Add your code to visualize confusion matrix using other plotting libraries
+    # Example using matplotlib
+    plt.imshow(cf_matrix, interpolation='nearest', cmap=plt.cm.Blues)
+    plt.title('Confusion Matrix')
+    plt.colorbar()
+
+    # Add labels to confusion matrix
+    classes = label_encoder.classes_  # Your class labels
+    tick_marks = range(len(classes))
+    plt.xticks(tick_marks, classes)
+    plt.yticks(tick_marks, classes)
+
+    plt.xlabel('Predicted Label')
+    plt.ylabel('True Label')
+    plt.show()
